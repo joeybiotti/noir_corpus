@@ -1,5 +1,42 @@
 use reqwest::blocking::Client;
+use serde::Deserialize;
 use std::error::Error;
+use super::parse::BookMetadata;
+
+#[derive(Deserialize)]
+struct GutendexPerson {
+    name: String,
+    birth_year: Option<i32>,
+    death_year: Option<i32>,
+}
+
+#[derive(Deserialize)]
+struct GutendexResponse {
+    title: String,
+    authors: Vec<GutendexPerson>,
+}
+
+pub fn fetch_gutenberg_metadata(book_id: u32) -> Result<BookMetadata, Box<dyn Error>> {
+    let url = format!("https://gutendex.com/books/{}", book_id);
+    let client = Client::builder().user_agent("prose_analyzer/1.0").build()?;
+
+    let response = client.get(&url).send()?;
+    let res: GutendexResponse = serde_json::from_str(&response.text()?)?;
+
+    let (author, birth, death) = if let Some(primary) = res.authors.first() {
+        (primary.name.clone(), primary.birth_year, primary.death_year)
+    } else {
+        ("Unknown".to_string(), None, None)
+    };
+
+    Ok(BookMetadata {
+        gutenberg_id: book_id,
+        title: res.title,
+        author,
+        author_birth_year: birth,
+        author_death_year: death,
+    })
+}
 
 pub fn fetch_gutenberg_text(book_id: u32) -> Result<String, Box<dyn Error>> {
     let url = format!(
@@ -7,7 +44,7 @@ pub fn fetch_gutenberg_text(book_id: u32) -> Result<String, Box<dyn Error>> {
         book_id, book_id
     );
 
-    // Fallback URL
+    // Fallback URL pattern for Gutenberg cache
     let alt_url = format!(
         "https://www.gutenberg.org/cache/epub/{}/pg{}.txt",
         book_id, book_id
@@ -15,7 +52,7 @@ pub fn fetch_gutenberg_text(book_id: u32) -> Result<String, Box<dyn Error>> {
 
     let client = Client::builder().user_agent("prose_analyzer/1.0").build()?;
 
-    println!("Fetching Book ID # {} from Project Gutenberg", book_id);
+    println!("Fetching Book ID # {} from Project Gutenberg...", book_id);
 
     let response = match client.get(&url).send() {
         Ok(res) if res.status().is_success() => res.text()?,
