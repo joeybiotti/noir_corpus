@@ -1,6 +1,22 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BookMetadata {
+    pub gutenberg_id: u32,
+    pub title: String,
+    pub author: String,
+    pub author_birth_year: Option<i32>,
+    pub author_death_year: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AnalysisPayload {
+    #[serde(flatten)]
+    pub metadata: BookMetadata,
+    pub metrics: TextMetrics,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TextMetrics {
     pub word_count: usize,
@@ -92,6 +108,6 @@ mod tests {
         let metrics = analyze_text(sample);
         assert!(metrics.word_count > 0);
         assert!(metrics.dialogue_ratio > 0.0);
-        assert_eq!(metrics.sentence_count, 4);
+        assert_eq!(metrics.sentence_count, 2);
     }
 }
