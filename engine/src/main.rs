@@ -7,36 +7,53 @@ use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let book_id: u32 = args
-        .get(1)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(209); // Default: Book #209 ("The Turn of the Screw")
 
-    println!("Fetching Metadata & Text for Book ID #{}...", book_id);
+    // Parse all positional arguments as u32 IDs.
+    // If no IDs passed, default to a classic literature batch.
+    let book_ids: Vec<u32> = if args.len() > 1 {
+        args[1..]
+            .iter()
+            .filter_map(|s| s.parse::<u32>().ok())
+            .collect()
+    } else {
+        vec![
+            209,  // The Turn of the Screw (Henry James)
+            863,  // The Mysterious Affair at Styles (Agatha Christie)
+            2852, // The Hound of the Baskervilles (Arthur Conan Doyle)
+        ]
+    };
 
-    // 1. Fetch metadata (Title, Author, Years) via Gutendex API
-    let metadata = fetch_gutenberg_metadata(book_id).unwrap_or_else(|_| BookMetadata {
-        gutenberg_id: book_id,
-        title: "Unknown Title".to_string(),
-        author: "Unknown Author".to_string(),
-        author_birth_year: None,
-        author_death_year: None,
-    });
+    println!("=== Processing Corpus Batch: {:?} ===\n", book_ids);
 
-    // 2. Fetch raw text via Gutenberg CDN
-    let raw_text = fetch_gutenberg_text(book_id).unwrap_or_else(|err| {
-        eprintln!("Failed to fetch text: {}", err);
-        std::process::exit(1);
-    });
+    let mut corpus_results: Vec<AnalysisPayload> = Vec::new();
 
-    // 3. Run metric analysis
-    let metrics = analyze_text(&raw_text);
+    for book_id in book_ids {
+        println!("--> Fetching & analyzing Book ID #{}...", book_id);
 
-    // 4. Combine into final flattened payload
-    let payload = AnalysisPayload { metadata, metrics };
+        let metadata = fetch_gutenberg_metadata(book_id).unwrap_or_else(|_| BookMetadata {
+            gutenberg_id: book_id,
+            title: "Unknown Title".to_string(),
+            author: "Unknown Author".to_string(),
+            author_birth_year: None,
+            author_death_year: None,
+        });
 
-    let json_output = serde_json::to_string_pretty(&payload).expect("Failed to serialize");
+        let raw_text = match fetch_gutenberg_text(book_id) {
+            Ok(text) => text,
+            Err(err) => {
+                eprintln!("    [!] Skipping Book #{}: {}", book_id, err);
+                continue;
+            }
+        };
 
-    println!("\n=== Stylistic Analysis Output ===");
+        let metrics = analyze_text(&raw_text);
+
+        corpus_results.push(AnalysisPayload { metadata, metrics });
+    }
+
+    let json_output = serde_json::to_string_pretty(&corpus_results)
+        .expect("Failed to serialize batch output");
+
+    println!("\n=== Corpus Batch Analysis Output ===");
     println!("{}", json_output);
 }
