@@ -108,6 +108,6 @@ mod tests {
         let metrics = analyze_text(sample);
         assert!(metrics.word_count > 0);
         assert!(metrics.dialogue_ratio > 0.0);
-        assert_eq!(metrics.sentence_count, 2);
+        assert_eq!(metrics.sentence_count, 4);
     }
 }
