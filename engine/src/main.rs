@@ -1,6 +1,8 @@
+mod db;
 mod gutenberg;
 mod parse;
 
+use db::Database;
 use gutenberg::{fetch_gutenberg_metadata, fetch_gutenberg_text};
 use parse::{analyze_text, AnalysisPayload, BookMetadata};
 use std::env;
@@ -8,24 +10,22 @@ use std::env;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    // Parse all positional arguments as u32 IDs.
-    // If no IDs passed, default to a classic literature batch.
     let book_ids: Vec<u32> = if args.len() > 1 {
         args[1..]
             .iter()
             .filter_map(|s| s.parse::<u32>().ok())
             .collect()
     } else {
-        vec![
-            209,  // The Turn of the Screw (Henry James)
-            863,  // The Mysterious Affair at Styles (Agatha Christie)
-            2852, // The Hound of the Baskervilles (Arthur Conan Doyle)
-        ]
+        vec![209, 863, 2852]
     };
 
-    println!("=== Processing Corpus Batch: {:?} ===\n", book_ids);
+    // 1. Initialize local DuckDB connection
+    let db = Database::new("noir_corpus.duckdb").unwrap_or_else(|err| {
+        eprintln!("Failed to initialize DuckDB: {}", err);
+        std::process::exit(1);
+    });
 
-    let mut corpus_results: Vec<AnalysisPayload> = Vec::new();
+    println!("=== Processing Corpus Batch into DuckDB: {:?} ===\n", book_ids);
 
     for book_id in book_ids {
         println!("--> Fetching & analyzing Book ID #{}...", book_id);
@@ -47,13 +47,15 @@ fn main() {
         };
 
         let metrics = analyze_text(&raw_text);
+        let payload = AnalysisPayload { metadata, metrics };
 
-        corpus_results.push(AnalysisPayload { metadata, metrics });
+        // 2. Persist directly to DuckDB
+        if let Err(err) = db.save_payload(&payload) {
+            eprintln!("    [!] Error saving Book #{} to DB: {}", book_id, err);
+        } else {
+            println!("    [✓] Persisted '{}' to DuckDB", payload.metadata.title);
+        }
     }
 
-    let json_output = serde_json::to_string_pretty(&corpus_results)
-        .expect("Failed to serialize batch output");
-
-    println!("\n=== Corpus Batch Analysis Output ===");
-    println!("{}", json_output);
+    println!("\n=== Done! Records written to noir_corpus.duckdb ===");
 }
