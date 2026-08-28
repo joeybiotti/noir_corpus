@@ -1,0 +1,5 @@
+# sources/noir_corpus/connection.yaml
+name: noir_corpus
+type: duckdb
+options:
+  filename: ../../engine/noir_corpus.duckdb

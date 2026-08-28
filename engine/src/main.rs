@@ -24,21 +24,15 @@ fn main() {
             .collect()
     } else {
         vec![
-            108,   // The Return of Sherlock Holmes - Arthur Conan Doyle
-            2097,  // The Sign of the Four - Arthur Conan Doyle
-            1661,  // The Adventures of Sherlock Holmes - Arthur Conan Doyle
-            2852,  // The Circular Staircase - Mary Roberts Rinehart
-            155,   // The Moonstone - Wilkie Collins
-            1188,  // The Mystery of Edwin Drood - Charles Dickens
-            967,   // The Murders in the Rue Morgue - Edgar Allan Poe
-            2147,  // The Works of Edgar Allan Poe - Vol 2 (Raven/Poe stories)
-            7020,  // The Red House Mystery - A. A. Milne
-            400,   // The Innocence of Father Brown - G. K. Chesterton
-            2238,  // The Wisdom of Father Brown - G. K. Chesterton
-            834,   // The Mystery of the Yellow Room - Gaston Leroux
-            174,   // The Picture of Dorian Gray - Oscar Wilde
-            5200,  // The Metamorphosis - Franz Kafka
-            829,   // The Golden Bug - Edgar Allan Poe
+            // Arthur Conan Doyle (Sherlock Holmes)
+            108, 1661, 2097, // Edgar Allan Poe (C. Auguste Dupin / Early Detective)
+            967, 2147, 829,
+            // Wilkie Collins & Mary Roberts Rinehart (Early Crime / Detective)
+            155, 2852, 400, 2238, 7020, // Maurice Leblanc (Arsène Lupin)
+            4017, 4026, // Anna Katharine Green
+            273, 534, // E. W. Hornung (Raffles)
+            483, 735, // Gaston Leroux
+            834, 1751,
         ]
     };
 
@@ -51,13 +45,14 @@ fn main() {
             std::process::exit(1);
         });
 
-    let db = Database::new("noir_corpus.duckdb").unwrap_or_else(|err| {
+    // Initialize DuckDB connection (can use :memory: or local DB)
+    let db = Database::new(":memory:").unwrap_or_else(|err| {
         eprintln!("Failed to initialize DuckDB: {}", err);
         std::process::exit(1);
     });
 
     println!(
-        "=== Processing Corpus Batch into DuckDB: {} Candidates ===\n",
+        "=== Processing Corpus Batch into Parquet/DuckDB: {} Candidates ===\n",
         book_ids.len()
     );
 
@@ -75,7 +70,10 @@ fn main() {
 
         // 1. Filter out books that don't match target genres
         if !is_target_genre(&raw_text) {
-            println!("    [-] Skipping Book #{}: Outside mystery/fiction genre target", book_id);
+            println!(
+                "    [-] Skipping Book #{}: Outside mystery/crime genre target",
+                book_id
+            );
             continue;
         }
 
@@ -88,7 +86,7 @@ fn main() {
 
         let payload = AnalysisPayload { metadata, metrics };
 
-        // 4. Save to DuckDB
+        // 4. Save to DuckDB table
         if let Err(err) = db.save_payload(&payload) {
             eprintln!("    [!] Error saving Book #{}: {}", book_id, err);
         } else {
@@ -99,5 +97,13 @@ fn main() {
         }
     }
 
-    println!("\n=== Done! Records written to noir_corpus.duckdb ===");
+    // 5. Export table to Parquet file for Evidence (bypasses DuckDB file lock issues)
+    println!("\n--> Exporting corpus metrics to Parquet...");
+    if let Err(err) = db.export_to_parquet("noir_corpus.parquet") {
+        eprintln!("    [!] Error exporting to Parquet: {}", err);
+    } else {
+        println!("    [✓] Successfully exported data to 'noir_corpus.parquet'");
+    }
+
+    println!("\n=== Done! Output written to noir_corpus.parquet ===");
 }

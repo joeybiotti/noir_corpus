@@ -15,6 +15,7 @@
 *.shm
 *.sqlite
 *.sqlite3
+*.parquet
 
 # Evidence
 node_modules/
