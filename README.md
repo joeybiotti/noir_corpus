@@ -6,6 +6,7 @@ The system ingests raw Project Gutenberg texts, cleans boilerplate, computes tok
 
 ## Architecture & Data Flow
 
+```text
   +-----------------------+
   |  Project Gutenberg    |
   |  Raw .txt Downloads   |
@@ -33,6 +34,8 @@ The system ingests raw Project Gutenberg texts, cleans boilerplate, computes tok
   |  - In-Browser SQL     |
   |  - Dynamic SVG Charts |
   +-----------------------+
+```
+
 
 ## Project Structure
 
