@@ -1,0 +1,4 @@
+name: noir_corpus
+type: duckdb
+options:
+  filename: ../../engine/noir_corpus.parquet
